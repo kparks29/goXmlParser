@@ -313,7 +313,7 @@ func createHomdnaModel(address *models.AddressModel, lot *models.LotModel, struc
 	return model
 }
 
-func getFile() *Result {
+func parseXml() *Result {
 
 	var result = new(Result)
 
@@ -337,15 +337,15 @@ func getFile() *Result {
 
 func main() {
 
-	xmlFile := getFile()
+	result := parseXml()
 
-	address := createAddressModel(xmlFile)
-	appliances := createApplianceModels(xmlFile.Property.Structure.KitchenAppliances)
-	lotFeatures := createLotFeatureModels(xmlFile.Property.Structure.LotFeatures)
-	structureFeatures := createStructureFeatureModels(xmlFile.Property.Structure.StructureFeatures)
-	lotSize := getSize(xmlFile.Property.LotInfo.LotSize)
+	address := createAddressModel(result)
+	appliances := createApplianceModels(result.Property.Structure.KitchenAppliances)
+	lotFeatures := createLotFeatureModels(result.Property.Structure.LotFeatures)
+	structureFeatures := createStructureFeatureModels(result.Property.Structure.StructureFeatures)
+	lotSize := getSize(result.Property.LotInfo.LotSize)
 	lot := createLot(&lotSize, lotFeatures)
-	structures := createStructures(xmlFile.Property.Structure, structureFeatures, appliances)
+	structures := createStructures(result.Property.Structure, structureFeatures, appliances)
 	homdna := createHomdnaModel(address, lot, structures)
 
 }
