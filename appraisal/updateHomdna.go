@@ -1,28 +1,36 @@
 package appraisal
 
 import (
-	"github.com/homdna/homdna-models"
+	"encoding/base64"
 )
 
-func UpdateHomdnaModel(file *[]byte) (models.HomdnaModel, *[]byte, string, string, error) {
+func UpdateHomdnaModel(file *[]byte) (*AppraisalResponse, error) {
 
 	result, err := ParseXml(file)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 
-	address := appraisal.CreateAddressModel(result)
-	appliances := appraisal.CreateApplianceModels(result.Property.Structure.KitchenAppliances)
-	lotFeatures := appraisal.CreateLotFeatureModels(result.Property.Structure.LotFeatures)
-	structureFeatures := appraisal.CreateStructureFeatureModels(result.Property.Structure.StructureFeatures)
-	lotSize := appraisal.GetSize(result.Property.LotInfo.LotSize)
-	lot := appraisal.CreateLot(&lotSize, lotFeatures)
-	structures := appraisal.CreateStructures(result.Property.Structure, structureFeatures, appliances)
-	homdna := appraisal.CreateHomdnaModel(address, lot, structures)
+	address := CreateAddressModel(result)
+	appliances := CreateApplianceModels(result.Property.Structure.KitchenAppliances)
+	lotFeatures := CreateLotFeatureModels(result.Property.Structure.LotFeatures)
+	structureFeatures := CreateStructureFeatureModels(result.Property.Structure.StructureFeatures)
+	lotSize := GetSize(result.Property.LotInfo.LotSize)
+	lot := CreateLot(&lotSize, lotFeatures)
+	structures := CreateStructures(result.Property.Structure, structureFeatures, appliances)
+	homdna := CreateHomdnaModel(address, lot, structures)
 
-	if document, err := base64.StdEncoding.DecodeString(&result.Report.Document.File); err != nil {
-		return nil, nil, nil, nil, err
+	document, err := base64.StdEncoding.DecodeString(result.Report.Document.File)
+	if err != nil {
+		return nil, err
 	}
 
-	return homdna, document, &result.Report.Document.MIMEType, &result.Report.Document.Name, nil
+	appraisalResponse := &AppraisalResponse{
+		Homdna:            homdna,
+		AppraisalDocument: &document,
+		MIMEType:          &result.Report.Document.MIMEType,
+		DocumentName:      &result.Report.Document.Name,
+	}
+
+	return appraisalResponse, nil
 }

@@ -5,6 +5,13 @@ import (
 	"github.com/homdna/homdna-models"
 )
 
+type AppraisalResponse struct {
+	Homdna            *models.HomdnaModel
+	AppraisalDocument *[]byte
+	MIMEType          *string
+	DocumentName      *string
+}
+
 type FilePayload struct {
 	file_payload string
 }
@@ -19,7 +26,7 @@ type DocumentPayload struct {
 type Document struct {
 	Name         string `xml:"_Name,attr"`
 	EncodingType string `xml:"_EncodingType,attr"`
-	MIMEType     string `xml:"_MIMEType,attr"`
+	MIMEType     string `xml:"MIMEType,attr"`
 	Type         string `xml:"_Type,attr"`
 	File         string `xml:"DOCUMENT"`
 }

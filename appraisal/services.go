@@ -1,16 +1,16 @@
 package appraisal
 
 import (
-	"bytes"
+	// "bytes"
 	"code.google.com/p/go-uuid/uuid"
 	"crypto/md5"
 	"encoding/base64"
-	"encoding/json"
+	// "encoding/json"
 	"encoding/xml"
-	"fmt"
+	// "fmt"
 	"github.com/homdna/homdna-models"
 	"io/ioutil"
-	"net/http"
+	// "net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -203,7 +203,7 @@ func ParseXml(file *[]byte) (*Result, error) {
 
 	result := &Result{}
 
-	err = xml.Unmarshal(*file, &result)
+	err := xml.Unmarshal(*file, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -217,63 +217,63 @@ func GetFileMd5(file *string) [16]byte {
 	return md5Hash
 }
 
-func PostDocument(homdnaId string, document *Document, serviceApiKey *string) string {
-	id := uuid.New()
-	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/documents"
-	docType := "Appraisal"
-	payload, _ := json.Marshal(DocumentPayload{
-		Uuid:         &id,
-		DocumentName: document.Name,
-		DocumentType: docType,
-	})
+// func PostDocument(homdnaId string, document *Document, serviceApiKey *string) string {
+// 	id := uuid.New()
+// 	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/documents"
+// 	docType := "Appraisal"
+// 	payload, _ := json.Marshal(DocumentPayload{
+// 		Uuid:         &id,
+// 		DocumentName: document.Name,
+// 		DocumentType: docType,
+// 	})
 
-	client := &http.Client{}
-	request, err := http.NewRequest("POST", url, bytes.NewReader(payload))
-	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
-	response, err := client.Do(request)
+// 	client := &http.Client{}
+// 	request, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+// 	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+// 	response, err := client.Do(request)
 
-	if err != nil {
-		os.Exit(4)
-	}
-	if response.StatusCode != http.StatusOK {
-		fmt.Sprintf("Status code: %v Status: %v", response.StatusCode, response.Status)
-		os.Exit(5)
-	}
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		os.Exit(6)
-	}
+// 	if err != nil {
+// 		os.Exit(4)
+// 	}
+// 	if response.StatusCode != http.StatusOK {
+// 		fmt.Sprintf("Status code: %v Status: %v", response.StatusCode, response.Status)
+// 		os.Exit(5)
+// 	}
+// 	body, err := ioutil.ReadAll(response.Body)
+// 	if err != nil {
+// 		os.Exit(6)
+// 	}
 
-	fmt.Printf("\n\nbody\n%v\n\n", body)
-	return "Success"
-}
+// 	fmt.Printf("\n\nbody\n%v\n\n", body)
+// 	return "Success"
+// }
 
-func PostFile(homdna *HomdnaResponse, md5Hash [16]byte, document *Document, serviceApiKey *string) string {
-	documentId := PostDocument(homdna.id, document, serviceApiKey)
-	client := &http.Client{}
-	url := "https://dev.homdna.com/homdnas/" + homdna.id + "/documents/" + documentId + "/files"
-	payload, _ := json.Marshal(FilePayload{
-		file_payload: document.File,
-	})
+// func PostFile(homdna *HomdnaResponse, md5Hash [16]byte, document *Document, serviceApiKey *string) string {
+// 	documentId := PostDocument(homdna.id, document, serviceApiKey)
+// 	client := &http.Client{}
+// 	url := "https://dev.homdna.com/homdnas/" + homdna.id + "/documents/" + documentId + "/files"
+// 	payload, _ := json.Marshal(FilePayload{
+// 		file_payload: document.File,
+// 	})
 
-	request, err := http.NewRequest("POST", url, bytes.NewReader(payload))
-	request.Header["Content-Type"] = []string{document.MIMEType}
-	request.Header["Content-MD5"] = []string{string(md5Hash[:])}
-	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
-	response, err := client.Do(request)
+// 	request, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+// 	request.Header["Content-Type"] = []string{document.MIMEType}
+// 	request.Header["Content-MD5"] = []string{string(md5Hash[:])}
+// 	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+// 	response, err := client.Do(request)
 
-	if err != nil {
-		os.Exit(4)
-	}
-	if response.StatusCode != http.StatusOK {
-		fmt.Sprintf("Status code: %v Status: %v", response.StatusCode, response.Status)
-		os.Exit(5)
-	}
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		os.Exit(6)
-	}
+// 	if err != nil {
+// 		os.Exit(4)
+// 	}
+// 	if response.StatusCode != http.StatusOK {
+// 		fmt.Sprintf("Status code: %v Status: %v", response.StatusCode, response.Status)
+// 		os.Exit(5)
+// 	}
+// 	body, err := ioutil.ReadAll(response.Body)
+// 	if err != nil {
+// 		os.Exit(6)
+// 	}
 
-	fmt.Printf("\n\nbody\n%v\n\n", body)
-	return "Success"
-}
+// 	fmt.Printf("\n\nbody\n%v\n\n", body)
+// 	return "Success"
+// }

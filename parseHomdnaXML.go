@@ -1,17 +1,24 @@
 package main
 
 import (
-// "github.com/kparks29/homdna-xml-parser/appraisal"
-// "log"
-// "os"
+	"fmt"
+	"github.com/kparks29/homdna-xml-parser/appraisal"
+	"log"
+	"os"
 )
 
 func main() {
 
-	// file, err := appraisal.ReadFile(os.Args[1])
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
+	file, err := appraisal.ReadFile(os.Args[1])
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	appraisalResponse, err := appraisal.UpdateHomdnaModel(file)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	// result := appraisal.ParseXml(file)
 	// homdnaVersion := &appraisal.HomdnaResponse{}
 	// if appraisalConfig, err := appraisal.LoadAppraisalConfig("./appraisal.conf"); err != nil {
