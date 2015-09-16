@@ -10,6 +10,7 @@ type AppraisalResponse struct {
 	AppraisalDocument *[]byte
 	MIMEType          *string
 	DocumentName      *string
+	ParsedXML         *Result
 }
 
 type FilePayload struct {

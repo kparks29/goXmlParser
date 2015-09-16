@@ -30,6 +30,7 @@ func UpdateHomdnaModel(file *[]byte) (*AppraisalResponse, error) {
 		AppraisalDocument: &document,
 		MIMEType:          &result.Report.Document.MIMEType,
 		DocumentName:      &result.Report.Document.Name,
+		ParsedXML:         result,
 	}
 
 	return appraisalResponse, nil
