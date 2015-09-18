@@ -10,7 +10,7 @@ import (
 	"github.com/homdna/homdna-models"
 	"github.com/homdna/homdna-service/domain"
 	"github.com/homdna/homdna-service/requests"
-	"github.com/kparks29/homdna-xml-parser/appraisal"
+	"github.com/kparks29/homdna-xml-parser/mismo"
 	"io/ioutil"
 	"log"
 	"net/http"

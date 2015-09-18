@@ -1,4 +1,4 @@
-package appraisal
+package mismo
 
 import (
 	"encoding/base64"

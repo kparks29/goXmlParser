@@ -1,9 +1,13 @@
 package main
 
-import ()
+import (
+	"fmt"
+	"github.com/kparks29/Document_Parser/documentParser"
+)
 
 func main() {
 	// 1) from command line get file_location, mimetype, standard, homdna_uuid
+	fmt.Printf("\n %#v", documentParser)
 	// 2) get homdna version
 	// 3) parse
 	// 4) iterate through parsed files
@@ -20,94 +24,16 @@ func main() {
 // 	"encoding/base64"
 // 	"encoding/json"
 // 	"errors"
-// 	"fmt"
 // 	"github.com/homdna/homdna-models"
 // 	"github.com/homdna/homdna-service/domain"
 // 	"github.com/homdna/homdna-service/requests"
-// 	"github.com/kparks29/homdna-xml-parser/appraisal"
+// 	"github.com/kparks29/Document_Parser/mismo"
 // 	"io/ioutil"
 // 	"log"
 // 	"net/http"
 // 	"os"
 // 	"strings"
 // )
-
-// func createDocumentRequest(document *appraisal.Document) (*[]byte, error) {
-// 	uuid := uuid.New()
-// 	docType := "Appraisal"
-// 	var fileIds []string
-// 	payload, err := json.Marshal(requests.HomdnaDocumentCreationRequest{
-// 		Uuid:         &uuid,
-// 		DocumentType: docType,
-// 		DocumentName: document.Name,
-// 		FileUuids:    fileIds,
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &payload, err
-// }
-
-// func parseName(name string) (first string, last string) {
-// 	first = ""
-// 	last = strings.TrimSpace(name)
-
-// 	idx := strings.LastIndex(last, " ")
-// 	if idx > 0 {
-// 		first = last[:idx]
-// 		last = last[idx+1:]
-// 	}
-// 	return
-// }
-
-// func makeRequest(method string, url string, payload *[]byte, serviceApiKey *string) (*http.Response, error) {
-// 	client := &http.Client{}
-// 	request, err := http.NewRequest("POST", url, bytes.NewReader(*payload))
-// 	request.Header["Content-Type"] = []string{"application/json"}
-// 	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
-// 	response, err := client.Do(request)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if response.StatusCode != http.StatusOK {
-// 		body, _ := ioutil.ReadAll(response.Body)
-// 		fmt.Printf("Status code: %v Status: %v RESPONSE: %v", response.StatusCode, response.Status, string(body))
-// 		return nil, errors.New("Bad Status Code")
-// 	}
-// 	return response, nil
-// }
-
-// func CreateAccount(email string, fullName string, serviceApiKey *string) *requests.AccountCreationRequest {
-// 	firstName, lastName := parseName(fullName)
-// 	accountCreationRequest := &requests.AccountCreationRequest{
-// 		Role:         "Home Owner",
-// 		FullName:     &fullName,
-// 		FirstName:    &firstName,
-// 		LastName:     lastName,
-// 		EmailAddress: email,
-// 	}
-// 	return accountCreationRequest
-// }
-
-// func PostNewHomdna(homdnaPayload *models.HomdnaModel, homdnaRequest *requests.HomdnaRequest, serviceApiKey *string) error {
-
-// 	payload, err := json.Marshal(*homdnaRequest)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	response, err := makeRequest("POST", "https://dev.homdna.com/homdnas", &payload, serviceApiKey)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	bodyBytes, err := ioutil.ReadAll(response.Body)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	fmt.Printf("\n response %v\n\n", string(bodyBytes))
-
-// 	return nil
-// }
 
 // func main() {
 
@@ -193,4 +119,81 @@ func main() {
 // 		fmt.Println("\n\n failed at post version \n\n")
 // 		log.Fatalln(err)
 // 	}
+// }
+
+// func createDocumentRequest(document *appraisal.Document) (*[]byte, error) {
+// 	uuid := uuid.New()
+// 	docType := "Appraisal"
+// 	var fileIds []string
+// 	payload, err := json.Marshal(requests.HomdnaDocumentCreationRequest{
+// 		Uuid:         &uuid,
+// 		DocumentType: docType,
+// 		DocumentName: document.Name,
+// 		FileUuids:    fileIds,
+// 	})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &payload, err
+// }
+
+// func parseName(name string) (first string, last string) {
+// 	first = ""
+// 	last = strings.TrimSpace(name)
+
+// 	idx := strings.LastIndex(last, " ")
+// 	if idx > 0 {
+// 		first = last[:idx]
+// 		last = last[idx+1:]
+// 	}
+// 	return
+// }
+
+// func makeRequest(method string, url string, payload *[]byte, serviceApiKey *string) (*http.Response, error) {
+// 	client := &http.Client{}
+// 	request, err := http.NewRequest("POST", url, bytes.NewReader(*payload))
+// 	request.Header["Content-Type"] = []string{"application/json"}
+// 	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+// 	response, err := client.Do(request)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if response.StatusCode != http.StatusOK {
+// 		body, _ := ioutil.ReadAll(response.Body)
+// 		fmt.Printf("Status code: %v Status: %v RESPONSE: %v", response.StatusCode, response.Status, string(body))
+// 		return nil, errors.New("Bad Status Code")
+// 	}
+// 	return response, nil
+// }
+
+// func CreateAccount(email string, fullName string, serviceApiKey *string) *requests.AccountCreationRequest {
+// 	firstName, lastName := parseName(fullName)
+// 	accountCreationRequest := &requests.AccountCreationRequest{
+// 		Role:         "Home Owner",
+// 		FullName:     &fullName,
+// 		FirstName:    &firstName,
+// 		LastName:     lastName,
+// 		EmailAddress: email,
+// 	}
+// 	return accountCreationRequest
+// }
+
+// func PostNewHomdna(homdnaPayload *models.HomdnaModel, homdnaRequest *requests.HomdnaRequest, serviceApiKey *string) error {
+
+// 	payload, err := json.Marshal(*homdnaRequest)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	response, err := makeRequest("POST", "https://dev.homdna.com/homdnas", &payload, serviceApiKey)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	bodyBytes, err := ioutil.ReadAll(response.Body)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	fmt.Printf("\n response %v\n\n", string(bodyBytes))
+
+// 	return nil
 // }
