@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	// "github.com/kparks29/Document_Parser/documentParser"
-	// "github.com/kparks29/Document_Parser/mismo"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"github.com/homdna/homdna-models"
+	"github.com/kparks29/Document_Parser/mismo"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -20,6 +20,7 @@ func main() {
 		log.Fatalln("\n Missing Arguments! Need the following:  File Location, MIMEtype, Standard, and Homdna Uuid.")
 	}
 	filePath, mimeType, standard, homdna_uuid := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
+	fmt.Println(filePath, mimeType, standard, homdna_uuid)
 
 	serviceApiKey, err := GetApiKey()
 	if err != nil {
@@ -30,11 +31,23 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Printf("\n homdna: %#v \n\n", *homdna)
+	fmt.Printf("\n homdna: %#v \n\n", homdna.Structures[0])
 
 	// 3) parse
-	// 4) iterate through parsed files
-	// 5) pos document & file
+	file, err := mismo.ReadFile(filePath)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	parsedResult, err := mismo.UpdateHomdnaModel(file)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Printf("\n parsed homdna: %#v \n\n", parsedResult.Homdna.Structures[0])
+
+	// 4) merge homdnas
+	mergedHomdna := mismo.MergeHomdnas(*homdna, *parsedResult.Homdna)
+	fmt.Printf("\n merged homdna address: %#v \n\n", mergedHomdna.Structures[0])
+	// 5) post document & file
 	// 6) add file to homdna model
 	// 7) post new version
 }
@@ -80,11 +93,12 @@ func GetApiKey() (*string, error) {
 func GetLatestHomdna(homdnaId string, serviceApiKey string) (*models.HomdnaModel, error) {
 	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/versions/latest"
 	payload := []byte{}
-	fmt.Printf("\n %v \n %v \n %v \n %v \n\n", "GET", url, payload, serviceApiKey)
+
 	response, err := makeRequest("GET", url, &payload, &serviceApiKey)
 	if err != nil {
 		return nil, err
 	}
+
 	homdnaResponse, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
@@ -95,6 +109,7 @@ func GetLatestHomdna(homdnaId string, serviceApiKey string) (*models.HomdnaModel
 	if err != nil {
 		return nil, err
 	}
+
 	return &homdna, nil
 }
 
