@@ -1,16 +1,17 @@
 package appraisal
 
 import (
-	// "bytes"
+	"bytes"
 	"code.google.com/p/go-uuid/uuid"
 	"crypto/md5"
 	"encoding/base64"
-	// "encoding/json"
+	"encoding/json"
 	"encoding/xml"
-	// "fmt"
+	"errors"
+	"fmt"
 	"github.com/homdna/homdna-models"
 	"io/ioutil"
-	// "net/http"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -211,69 +212,114 @@ func ParseXml(file *[]byte) (*Result, error) {
 	return result, nil
 }
 
-func GetFileMd5(file *string) [16]byte {
-	decoded, _ := base64.StdEncoding.DecodeString(*file)
-	md5Hash := md5.Sum(decoded)
-	return md5Hash
+func GetFileMd5(file *[]byte) (*string, error) {
+	h := md5.New()
+	_, err := h.Write(*file)
+	if err != nil {
+		return nil, err
+	}
+
+	// must convert to string becuase the EncodeToString expects a byte array represented by ascii characters and the md5.sum returns the numerical value
+	md5String := fmt.Sprintf("%x", h.Sum(nil))
+	generatedChecksum := base64.StdEncoding.EncodeToString([]byte(md5String))
+
+	return &generatedChecksum, nil
 }
 
-// func PostDocument(homdnaId string, document *Document, serviceApiKey *string) string {
-// 	id := uuid.New()
-// 	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/documents"
-// 	docType := "Appraisal"
-// 	payload, _ := json.Marshal(DocumentPayload{
-// 		Uuid:         &id,
-// 		DocumentName: document.Name,
-// 		DocumentType: docType,
-// 	})
+func PostDocument(homdnaId *string, documentPayload *[]byte, serviceApiKey *string) (*[]byte, error) {
+	url := "https://dev.homdna.com/homdnas/" + *homdnaId + "/documents"
 
-// 	client := &http.Client{}
-// 	request, err := http.NewRequest("POST", url, bytes.NewReader(payload))
-// 	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
-// 	response, err := client.Do(request)
+	client := &http.Client{}
+	request, err := http.NewRequest("POST", url, bytes.NewReader(*documentPayload))
+	if err != nil {
+		return nil, err
+	}
+	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
 
-// 	if err != nil {
-// 		os.Exit(4)
-// 	}
-// 	if response.StatusCode != http.StatusOK {
-// 		fmt.Sprintf("Status code: %v Status: %v", response.StatusCode, response.Status)
-// 		os.Exit(5)
-// 	}
-// 	body, err := ioutil.ReadAll(response.Body)
-// 	if err != nil {
-// 		os.Exit(6)
-// 	}
+	if response.StatusCode != http.StatusCreated {
+		fmt.Printf("Status code: %v Status: %v", response.StatusCode, response.Status)
+		return nil, errors.New("Bad Request")
+	}
 
-// 	fmt.Printf("\n\nbody\n%v\n\n", body)
-// 	return "Success"
-// }
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
 
-// func PostFile(homdna *HomdnaResponse, md5Hash [16]byte, document *Document, serviceApiKey *string) string {
-// 	documentId := PostDocument(homdna.id, document, serviceApiKey)
-// 	client := &http.Client{}
-// 	url := "https://dev.homdna.com/homdnas/" + homdna.id + "/documents/" + documentId + "/files"
-// 	payload, _ := json.Marshal(FilePayload{
-// 		file_payload: document.File,
-// 	})
+	return &body, nil
+}
 
-// 	request, err := http.NewRequest("POST", url, bytes.NewReader(payload))
-// 	request.Header["Content-Type"] = []string{document.MIMEType}
-// 	request.Header["Content-MD5"] = []string{string(md5Hash[:])}
-// 	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
-// 	response, err := client.Do(request)
+func PostFile(homdnaId string, md5Hash *string, documentId string, document *Document, serviceApiKey *string) (*[]byte, error) {
+	client := &http.Client{}
+	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/documents/" + documentId + "/files"
 
-// 	if err != nil {
-// 		os.Exit(4)
-// 	}
-// 	if response.StatusCode != http.StatusOK {
-// 		fmt.Sprintf("Status code: %v Status: %v", response.StatusCode, response.Status)
-// 		os.Exit(5)
-// 	}
-// 	body, err := ioutil.ReadAll(response.Body)
-// 	if err != nil {
-// 		os.Exit(6)
-// 	}
+	request, err := http.NewRequest("POST", url, bytes.NewReader([]byte(document.File)))
+	request.Header["Content-Type"] = []string{document.MIMEType}
+	request.Header["Content-MD5"] = []string{*md5Hash}
+	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
 
-// 	fmt.Printf("\n\nbody\n%v\n\n", body)
-// 	return "Success"
-// }
+	if response.StatusCode != http.StatusCreated {
+		fmt.Printf("Status code: %v Status: %v", response.StatusCode, response.Status)
+		return nil, errors.New("Bad Request")
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &body, nil
+}
+
+func PostFirstVersion(homdnaId string, homdna *models.HomdnaModel, serviceApiKey *string) (*[]byte, error) {
+	client := &http.Client{}
+	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/versions"
+	jsonPayload, err := json.Marshal(*homdna)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := base64.StdEncoding.EncodeToString(jsonPayload)
+
+	md5Hash, err := GetFileMd5(&jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", url, bytes.NewReader([]byte(payload)))
+	if err != nil {
+		return nil, err
+	}
+	request.Header["Content-MD5"] = []string{*md5Hash}
+	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+	request.Header["X-Homdna-Modified-Version"] = []string{"1"}
+	request.Header["X-Homdna-Version"] = []string{"2"}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusCreated {
+		body, _ := ioutil.ReadAll(response.Body)
+		fmt.Printf("\n Body: %v\n\n", string(body))
+		fmt.Printf("Status code: %v Status: %v", response.StatusCode, response.Status)
+		return nil, errors.New("Bad Request")
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("\n Body: %v\n\n", string(body))
+
+	return &body, nil
+}

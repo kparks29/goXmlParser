@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"code.google.com/p/go-uuid/uuid"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/homdna/homdna-models"
+	"github.com/homdna/homdna-service/domain"
 	"github.com/homdna/homdna-service/requests"
 	"github.com/kparks29/homdna-xml-parser/appraisal"
 	"io/ioutil"
@@ -14,6 +17,22 @@ import (
 	"os"
 	"strings"
 )
+
+func createDocumentRequest(document *appraisal.Document) (*[]byte, error) {
+	uuid := uuid.New()
+	docType := "Appraisal"
+	var fileIds []string
+	payload, err := json.Marshal(requests.HomdnaDocumentCreationRequest{
+		Uuid:         &uuid,
+		DocumentType: docType,
+		DocumentName: document.Name,
+		FileUuids:    fileIds,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &payload, err
+}
 
 func parseName(name string) (first string, last string) {
 	first = ""
@@ -101,26 +120,63 @@ func main() {
 	serviceApiKey := &appraisalConfig.ServiceApiKey
 
 	// CREATE USER ACCOUNT REQUEST OBJECT
-	fullName := appraisalResponse.ParsedXML.Property.Owner.Name
-	accountCreationRequest := CreateAccount(os.Args[2], fullName, serviceApiKey)
-	address := &appraisalResponse.Homdna.Address
+	// fullName := appraisalResponse.ParsedXML.Property.Owner.Name
+	// accountCreationRequest := CreateAccount(os.Args[2], fullName, serviceApiKey)
+	// address := &appraisalResponse.Homdna.Address
 
 	// CREATE HOMDNA REQUEST OBJECT
-	homdnaRequest := &requests.HomdnaRequest{
-		StreetAddress:    address.StreetAddress,
-		City:             address.City,
-		State:            address.State,
-		PostalCode:       address.PostalCode,
-		PrimaryHomeOwner: *accountCreationRequest,
-	}
+	// homdnaRequest := &requests.HomdnaRequest{
+	// 	StreetAddress:    address.StreetAddress,
+	// 	City:             address.City,
+	// 	State:            address.State,
+	// 	PostalCode:       address.PostalCode,
+	// 	PrimaryHomeOwner: *accountCreationRequest,
+	// }
 
-	// CREATE HOMDNA
+	CREATE HOMDNA
 	if err = PostNewHomdna(appraisalResponse.Homdna, homdnaRequest, serviceApiKey); err != nil {
 		log.Fatalln(err)
 	}
 
+	// PREPARE DOCUMENT
+	homdnaId := "2f6a2416-90a9-47bb-a52e-b77248da5f3d" //temp id
+	documentPayload, err := createDocumentRequest(&appraisalResponse.ParsedXML.Report.Document)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	// POST DOCUMENT
+	documentResponse, err := appraisal.PostDocument(&homdnaId, documentPayload, serviceApiKey)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	document := domain.HomdnaDocument{}
+	err = json.Unmarshal(*documentResponse, &document)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	// PREPARE FILE
+	body, err := base64.StdEncoding.DecodeString(appraisalResponse.ParsedXML.Report.Document.File)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	md5Hash, err := appraisal.GetFileMd5(&body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	// POST FILE
+	_, err = appraisal.PostFile(homdnaId, md5Hash, document.Uuid, &appraisalResponse.ParsedXML.Report.Document, serviceApiKey)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// ADD DOCUMENT ID TO HOMDNA
+	appraisalResponse.Homdna.Documents = append(appraisalResponse.Homdna.Documents, document.Uuid)
 
 	// POST VERSION
-
+	_, err = appraisal.PostFirstVersion(homdnaId, appraisalResponse.Homdna, serviceApiKey)
+	if err != nil {
+		fmt.Println("\n\n failed at post version \n\n")
+		log.Fatalln(err)
+	}
 }
