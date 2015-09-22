@@ -1,96 +1,87 @@
 package main
 
 import (
-	"fmt"
-	// "github.com/kparks29/Document_Parser/documentParser"
 	"bytes"
+	"code.google.com/p/go-uuid/uuid"
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/homdna/homdna-models"
+	"github.com/homdna/homdna-service/domain"
+	"github.com/homdna/homdna-service/requests"
+	"github.com/kparks29/Document_Parser/documentParser"
 	"github.com/kparks29/Document_Parser/mismo"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 )
+
+type LatestHomdna struct {
+	Homdna  models.HomdnaModel
+	version int
+}
 
 func main() {
 	// 1) from command line get file_location, mimetype, standard, homdna_uuid
+	fmt.Println("Parsing arguments from terminal")
 	if len(os.Args) < 5 {
 		log.Fatalln("\n Missing Arguments! Need the following:  File Location, MIMEtype, Standard, and Homdna Uuid.")
 	}
 	filePath, mimeType, standard, homdna_uuid := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
-	fmt.Println(filePath, mimeType, standard, homdna_uuid)
+	parser := mismo.MismoDocumentParser{}
 
-	serviceApiKey, err := GetApiKey()
+	if !parser.SupportStandard(standard) {
+		log.Fatalln("Only Supports mismo standard")
+	}
+
+	serviceApiKey, err := documentParser.GetApiKey()
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	// 2) get homdna version
-	homdna, err := GetLatestHomdna(homdna_uuid, *serviceApiKey)
+	fmt.Println("Get latest Homdna version from server")
+	latestHomdna, err := GetLatestHomdna(homdna_uuid, *serviceApiKey)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Printf("\n homdna: %#v \n\n", homdna.Structures[0])
 
-	// 3) parse
+	// 3) parse & merge homdna
+	fmt.Println("Parsing the file")
 	file, err := mismo.ReadFile(filePath)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	parsedResult, err := mismo.UpdateHomdnaModel(file)
+	parsedResult, err := parser.Parse(*file, mimeType, &latestHomdna.Homdna)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Printf("\n parsed homdna: %#v \n\n", parsedResult.Homdna.Structures[0])
 
-	// 4) merge homdnas
-	mergedHomdna := mismo.MergeHomdnas(*homdna, *parsedResult.Homdna)
-	fmt.Printf("\n merged homdna address: %#v \n\n", mergedHomdna.Structures[0])
 	// 5) post document & file
-	// 6) add file to homdna model
+	fmt.Println("Posting Document & adding id's to Homdna.Documents")
+	for _, doc := range parsedResult.Documents {
+		documentId, err := getDocumentId(&doc, homdna_uuid, serviceApiKey)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		// 6) add document id to homdna model
+		parsedResult.Homdna.Documents = append(parsedResult.Homdna.Documents, *documentId)
+	}
+
 	// 7) post new version
-}
-
-type Config struct {
-	ServiceApiKey string `json:"service_api_key"`
-}
-
-func (this *Config) Validate() error {
-	if this.ServiceApiKey == "" {
-		return errors.New("A valid api key must be set. The hash key is used by other microservices to make requests to special APIs not intended for public consumption.")
-	}
-	return nil
-}
-
-func LoadConfig(filePath string) (*Config, error) {
-	file, err := os.Open(filePath)
+	fmt.Println("Posting new homdna version")
+	_, err = PostNewHomdna(homdna_uuid, parsedResult.Homdna, latestHomdna.version, serviceApiKey)
 	if err != nil {
-		return nil, err
+		fmt.Println("\n\n failed at post version \n\n")
+		log.Fatalln(err)
 	}
-	defer file.Close()
-	decoder := json.NewDecoder(file)
-	configData := &Config{}
-	if err := decoder.Decode(configData); err != nil {
-		return nil, err
-	}
-	return configData, nil
 }
 
-func GetApiKey() (*string, error) {
-	config, err := LoadConfig("./document_parser.conf")
-	if err != nil {
-		return nil, errors.New("Error loading configuration file.")
-	}
-	if err = config.Validate(); err != nil {
-		return nil, err
-	}
-
-	serviceApiKey := &config.ServiceApiKey
-	return serviceApiKey, nil
-}
-
-func GetLatestHomdna(homdnaId string, serviceApiKey string) (*models.HomdnaModel, error) {
+func GetLatestHomdna(homdnaId string, serviceApiKey string) (*LatestHomdna, error) {
 	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/versions/latest"
 	payload := []byte{}
 
@@ -110,147 +101,67 @@ func GetLatestHomdna(homdnaId string, serviceApiKey string) (*models.HomdnaModel
 		return nil, err
 	}
 
-	return &homdna, nil
+	version, err := strconv.Atoi(response.Header["X-Homdna-Version"][0])
+	if err != nil {
+		return nil, err
+	}
+
+	latestHomdna := LatestHomdna{
+		Homdna:  homdna,
+		version: version,
+	}
+
+	return &latestHomdna, nil
 }
 
-// ALREADY WRITTEN MOST OF THIS HERE
+func getDocumentId(doc *documentParser.ParsedFile, homdna_uuid string, serviceApiKey *string) (*string, error) {
+	// Prepare Docoument
+	documentPayload, err := createDocumentRequest(doc)
+	if err != nil {
+		return nil, err
+	}
+	// POST DOCUMENT
+	documentResponse, err := PostDocument(&homdna_uuid, documentPayload, serviceApiKey)
+	if err != nil {
+		return nil, err
+	}
 
-// import (
-// 	"bytes"
-// 	"code.google.com/p/go-uuid/uuid"
-// 	"encoding/base64"
-// 	"encoding/json"
-// 	"errors"
-// 	"github.com/homdna/homdna-models"
-// 	"github.com/homdna/homdna-service/domain"
-// 	"github.com/homdna/homdna-service/requests"
-// 	"io/ioutil"
-// 	"net/http"
-// 	"strings"
-// )
+	document := domain.HomdnaDocument{}
+	err = json.Unmarshal(*documentResponse, &document)
+	if err != nil {
+		return nil, err
+	}
 
-// func main() {
+	// PREPARE FILE
+	body := base64.StdEncoding.EncodeToString(doc.Body)
+	md5Hash, err := GetFileMd5(&doc.Body)
+	if err != nil {
+		return nil, err
+	}
+	// POST FILE
+	_, err = PostFile(homdna_uuid, document.Uuid, md5Hash, body, doc, serviceApiKey)
+	if err != nil {
+		return nil, err
+	}
 
-// xmlFile, err := os.Open(filePath)
-// if err != nil {
-// 	log.Fatalln(err)
-// }
+	return &document.Uuid, nil
+}
 
-// defer xmlFile.Close()
-
-// readFile, err := ioutil.ReadAll(xmlFile)
-// if err != nil {
-// 	log.Fatalln(err)
-// }
-
-// return &readFile, nil
-
-// 	// PASS IN A FILE TO RECEIVE A HOMDNA BACK (WORKFLOW 1)
-// 	appraisalResponse, err := appraisal.UpdateHomdnaModel(file)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-
-// 	// START OF POSTING HOMDNA OBJECT REMOTELY (WORKFLOW 2)
-// 	appraisalConfig, err := appraisal.LoadAppraisalConfig("./appraisal.conf")
-// 	if err != nil {
-// 		log.Fatalln("Error loading HOMDNA appraisal configuration file.", err)
-// 	}
-// 	if err = appraisalConfig.Validate(); err != nil {
-// 		log.Fatalln(err)
-// 	}
-
-// 	serviceApiKey := &appraisalConfig.ServiceApiKey
-
-// 	// CREATE USER ACCOUNT REQUEST OBJECT
-// 	// fullName := appraisalResponse.ParsedXML.Property.Owner.Name
-// 	// accountCreationRequest := CreateAccount(os.Args[2], fullName, serviceApiKey)
-// 	// address := &appraisalResponse.Homdna.Address
-
-// 	// CREATE HOMDNA REQUEST OBJECT
-// 	// homdnaRequest := &requests.HomdnaRequest{
-// 	// 	StreetAddress:    address.StreetAddress,
-// 	// 	City:             address.City,
-// 	// 	State:            address.State,
-// 	// 	PostalCode:       address.PostalCode,
-// 	// 	PrimaryHomeOwner: *accountCreationRequest,
-// 	// }
-
-// 	CREATE HOMDNA
-// 	if err = PostNewHomdna(appraisalResponse.Homdna, homdnaRequest, serviceApiKey); err != nil {
-// 		log.Fatalln(err)
-// 	}
-
-// 	// PREPARE DOCUMENT
-// 	homdnaId := "2f6a2416-90a9-47bb-a52e-b77248da5f3d" //temp id
-// 	documentPayload, err := createDocumentRequest(&appraisalResponse.ParsedXML.Report.Document)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-// 	// POST DOCUMENT
-// 	documentResponse, err := appraisal.PostDocument(&homdnaId, documentPayload, serviceApiKey)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-
-// 	document := domain.HomdnaDocument{}
-// 	err = json.Unmarshal(*documentResponse, &document)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-// 	// PREPARE FILE
-// 	body, err := base64.StdEncoding.DecodeString(appraisalResponse.ParsedXML.Report.Document.File)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-// 	md5Hash, err := appraisal.GetFileMd5(&body)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-// 	// POST FILE
-// 	_, err = appraisal.PostFile(homdnaId, md5Hash, document.Uuid, &appraisalResponse.ParsedXML.Report.Document, serviceApiKey)
-// 	if err != nil {
-// 		log.Fatalln(err)
-// 	}
-
-// 	// ADD DOCUMENT ID TO HOMDNA
-// 	appraisalResponse.Homdna.Documents = append(appraisalResponse.Homdna.Documents, document.Uuid)
-
-// 	// POST VERSION
-// 	_, err = appraisal.PostFirstVersion(homdnaId, appraisalResponse.Homdna, serviceApiKey)
-// 	if err != nil {
-// 		fmt.Println("\n\n failed at post version \n\n")
-// 		log.Fatalln(err)
-// 	}
-// }
-
-// func createDocumentRequest(document *appraisal.Document) (*[]byte, error) {
-// 	uuid := uuid.New()
-// 	docType := "Appraisal"
-// 	var fileIds []string
-// 	payload, err := json.Marshal(requests.HomdnaDocumentCreationRequest{
-// 		Uuid:         &uuid,
-// 		DocumentType: docType,
-// 		DocumentName: document.Name,
-// 		FileUuids:    fileIds,
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &payload, err
-// }
-
-// func parseName(name string) (first string, last string) {
-// 	first = ""
-// 	last = strings.TrimSpace(name)
-
-// 	idx := strings.LastIndex(last, " ")
-// 	if idx > 0 {
-// 		first = last[:idx]
-// 		last = last[idx+1:]
-// 	}
-// 	return
-// }
+func createDocumentRequest(document *documentParser.ParsedFile) (*[]byte, error) {
+	uuid := uuid.New()
+	docType := "Appraisal"
+	var fileIds []string
+	payload, err := json.Marshal(requests.HomdnaDocumentCreationRequest{
+		Uuid:         &uuid,
+		DocumentType: docType,
+		DocumentName: document.Name,
+		FileUuids:    fileIds,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &payload, err
+}
 
 func makeRequest(method string, url string, payload *[]byte, serviceApiKey *string) (*http.Response, error) {
 	client := &http.Client{}
@@ -269,34 +180,112 @@ func makeRequest(method string, url string, payload *[]byte, serviceApiKey *stri
 	return response, nil
 }
 
-// func CreateAccount(email string, fullName string, serviceApiKey *string) *requests.AccountCreationRequest {
-// 	firstName, lastName := parseName(fullName)
-// 	accountCreationRequest := &requests.AccountCreationRequest{
-// 		Role:         "Home Owner",
-// 		FullName:     &fullName,
-// 		FirstName:    &firstName,
-// 		LastName:     lastName,
-// 		EmailAddress: email,
-// 	}
-// 	return accountCreationRequest
-// }
+func GetFileMd5(file *[]byte) (*string, error) {
+	h := md5.New()
+	_, err := h.Write(*file)
+	if err != nil {
+		return nil, err
+	}
 
-// func PostNewHomdna(homdnaPayload *models.HomdnaModel, homdnaRequest *requests.HomdnaRequest, serviceApiKey *string) error {
+	// must convert to string becuase the EncodeToString expects a byte array represented by ascii characters and the md5.sum returns the numerical value
+	md5String := fmt.Sprintf("%x", h.Sum(nil))
+	generatedChecksum := base64.StdEncoding.EncodeToString([]byte(md5String))
 
-// 	payload, err := json.Marshal(*homdnaRequest)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	response, err := makeRequest("POST", "https://dev.homdna.com/homdnas", &payload, serviceApiKey)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	bodyBytes, err := ioutil.ReadAll(response.Body)
-// 	if err != nil {
-// 		return err
-// 	}
+	return &generatedChecksum, nil
+}
 
-// 	fmt.Printf("\n response %v\n\n", string(bodyBytes))
+func PostDocument(homdnaId *string, documentPayload *[]byte, serviceApiKey *string) (*[]byte, error) {
+	url := "https://dev.homdna.com/homdnas/" + *homdnaId + "/documents"
 
-// 	return nil
-// }
+	client := &http.Client{}
+	request, err := http.NewRequest("POST", url, bytes.NewReader(*documentPayload))
+	if err != nil {
+		return nil, err
+	}
+	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusCreated {
+		fmt.Printf("Status code: %v Status: %v", response.StatusCode, response.Status)
+		return nil, errors.New("Bad Request")
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &body, nil
+}
+
+func PostFile(homdnaId string, documentId string, md5Hash *string, encodedDoc string, document *documentParser.ParsedFile, serviceApiKey *string) (*[]byte, error) {
+	client := &http.Client{}
+	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/documents/" + documentId + "/files"
+
+	request, err := http.NewRequest("POST", url, bytes.NewReader([]byte(encodedDoc)))
+	request.Header["Content-Type"] = []string{document.MimeType}
+	request.Header["Content-MD5"] = []string{*md5Hash}
+	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusCreated {
+		fmt.Printf("Status code: %v Status: %v", response.StatusCode, response.Status)
+		return nil, errors.New("Bad Request")
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &body, nil
+}
+
+func PostNewHomdna(homdnaId string, homdna *models.HomdnaModel, version int, serviceApiKey *string) (*[]byte, error) {
+	client := &http.Client{}
+	url := "https://dev.homdna.com/homdnas/" + homdnaId + "/versions"
+	jsonPayload, err := json.Marshal(*homdna)
+	if err != nil {
+		return nil, err
+	}
+
+	// fmt.Println(string(jsonPayload))
+	// payload := base64.StdEncoding.EncodeToString(jsonPayload)
+	md5Hash, err := GetFileMd5(&jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", url, bytes.NewReader([]byte(jsonPayload)))
+	if err != nil {
+		return nil, err
+	}
+	request.Header["Content-MD5"] = []string{*md5Hash}
+	request.Header["X-Service-Api-Key"] = []string{*serviceApiKey}
+	request.Header["X-Homdna-Modified-Version"] = []string{strconv.Itoa(version)}
+	request.Header["X-Homdna-Version"] = []string{strconv.Itoa(version + 1)}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusCreated {
+		body, _ := ioutil.ReadAll(response.Body)
+		fmt.Printf("\n ERROR MESSAGE: %v\n\n", string(body))
+		fmt.Printf("Status code: %v Status: %v", response.StatusCode, response.Status)
+		return nil, errors.New("Bad Request")
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &body, nil
+}

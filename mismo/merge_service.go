@@ -1,7 +1,6 @@
 package mismo
 
 import (
-	"fmt"
 	"github.com/homdna/homdna-models"
 )
 
@@ -66,7 +65,6 @@ func MergeStructures(originalStructures []*models.StructureModel, parsedStructur
 	for index, structure := range structures {
 		if structure.StructureType == "main_house" {
 			hasMainHouse = true
-			fmt.Println(index)
 			structure.SpaceModel = MergeSpace(originalStructures[index].SpaceModel, parsedStructures[index].SpaceModel)
 			if structure.Size == nil {
 				structure.Size = parsedStructures[index].Size
@@ -96,14 +94,29 @@ func MergeRooms(originalRooms []*models.RoomModel, parsedRooms []*models.RoomMod
 		return parsedRooms
 	}
 
-	mergedRoom := make([]bool, len(rooms))
+	roomsMerged := make([]bool, len(rooms))
+	parsedRoomsMerged := make([]bool, len(parsedRooms))
 
+	// check to see if room needs to be merged and not just added
 	for i, room := range rooms {
-		mergedRoom[i] = false
-		for _, parsedRoom := range parsedRooms {
-			if room.RoomType == parsedRoom.RoomType {
-				mergedRoom[i] = true
+		for j, parsedRoom := range parsedRooms {
+			// only merge the room if it hasn't been merged into another room of same type or name
+			if room.RoomType == parsedRoom.RoomType && *room.Name == *parsedRoom.Name && !roomsMerged[i] && !parsedRoomsMerged[j] {
+				roomsMerged[i] = true
+				parsedRoomsMerged[j] = true
+				// merge room details here
+				room.SpaceModel = MergeSpace(originalRooms[i].SpaceModel, parsedRoom.SpaceModel)
+				if room.Level <= 1 {
+					room.Level = parsedRoom.Level
+				}
 			}
+		}
+	}
+
+	// if room hasn't been merge then add it
+	for i, val := range parsedRoomsMerged {
+		if !val {
+			rooms = append(rooms, parsedRooms[i])
 		}
 	}
 
@@ -117,23 +130,21 @@ func MergeSpace(originalSpace models.SpaceModel, parsedSpace models.SpaceModel) 
 	if space.Id == nil {
 		space.Id = parsedSpace.Id
 	}
-	space.Features = ConcatFeatures(space.Features, parsedSpace.Features)
-	space.Appliances = ConcatAppliances(space.Appliances, parsedSpace.Appliances)
+	space.Features = AppendFeatures(space.Features, parsedSpace.Features)
+	space.Appliances = AppendAppliances(space.Appliances, parsedSpace.Appliances)
 
 	return space
 }
 
-func ConcatFeatures(features []*models.FeatureModel, featuresToAdd []*models.FeatureModel) []*models.FeatureModel {
+func AppendFeatures(features []*models.FeatureModel, featuresToAdd []*models.FeatureModel) []*models.FeatureModel {
 	for _, feature := range featuresToAdd {
-		fmt.Println(feature)
 		features = append(features, feature)
 	}
 	return features
 }
 
-func ConcatAppliances(appliances []*models.ApplianceModel, appliancesToAdd []*models.ApplianceModel) []*models.ApplianceModel {
+func AppendAppliances(appliances []*models.ApplianceModel, appliancesToAdd []*models.ApplianceModel) []*models.ApplianceModel {
 	for _, appliance := range appliancesToAdd {
-		fmt.Println(appliance)
 		appliances = append(appliances, appliance)
 	}
 	return appliances

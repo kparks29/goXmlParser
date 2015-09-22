@@ -24,6 +24,38 @@ type DocumentPayload struct {
 	FileUuids    []string
 }
 
+type ApplianceType struct {
+	DisplayName string `json:"display_name"`
+	Name        string `json:"type_name"`
+}
+
+type ApplianceBrand struct {
+	Name        string `json:"brand_name"`
+	DisplayName string `json:"display_name"`
+}
+
+type ApplianceElement struct {
+	Type        ApplianceType  `json:"type_name"`
+	Brand       ApplianceBrand `json:"brand_name"`
+	ApplianceId string         `json:"appliance_id"`
+}
+
+type FeatureType struct {
+	Type string `json:"feature_type"`
+	Name string
+}
+
+type FeatureElement struct {
+	Name         string        `json:"feature_name"`
+	FeatureTypes []FeatureType `json:"feature_types"`
+}
+
+type Elements struct {
+	LotFeatures       []FeatureElement `json:"lot_features"`
+	StructureFeatures []FeatureElement `json:"exterior_features"`
+	RoomFeatures      []FeatureElement `json:"room_features"`
+}
+
 type Document struct {
 	Name         string `xml:"_Name,attr"`
 	EncodingType string `xml:"_EncodingType,attr"`
